@@ -14,8 +14,8 @@ Template structure (blank.numbers):
       R14   = Totaal row     (C3="Totaal", C4=amount)
 
 Dynamic behaviour:
-  N ≤ 10 items → delete unused rows from bottom (R11 down to R(N+2))
-  N > 10 items → insert rows before subtotaal for each extra item
+  N ≤ 5  → spacer rows inserted above each item and after last (2N+1 rows total)
+  N > 5  → items packed tight; delete unused rows or insert extras as needed
   Multiple BTW rates → insert extra BTW rows after first
 """
 
@@ -114,48 +114,80 @@ def _build_script(
     a('')
 
     # ── Line items ──
-    # Template has rows 2–11 (10 slots). Rows 2..min(N,10)+1 get filled.
-    # If N > 10: insert rows before the current subtotaal row for extras.
-    # If N < 10: delete unused rows from bottom.
+    # Spacer rows (empty) are inserted above each item and after the last item
+    # when N is small enough to fit comfortably on one page.
+    # Layout with spacers:  [sp, item0, sp, item1, ..., sp, itemN-1, sp]
+    #   2N+1 rows total; item i at row 3+2i; subtotaal at 2N+3
+    # Layout without spacers: items at rows 2..N+1; subtotaal at N+2
+    SPACER_THRESHOLD = 5  # use spacers when N <= this
 
-    for i, item in enumerate(items):
-        row = i + 2  # rows are 1-indexed; header is R1; items start at R2
+    use_spacers = N <= SPACER_THRESHOLD
 
-        if row <= 11:
-            # Row already exists in template
-            pass
-        else:
-            # Insert a row above the current subtotaal position.
-            # After (i-10) prior insertions, subtotaal is at row 12 + (i - 10) = i + 2.
-            subtotaal_row_now = i + 2
-            a(f'    add row above (row {subtotaal_row_now} of t2)')
+    if use_spacers:
+        rows_needed = 2 * N + 1  # N items + N+1 spacers
 
-        omsch = _esc(item["omschrijving"])
-        bedrag = _fmt_num(item["bedrag"])
-
-        a(f'    set value of cell {row} of column 1 of t2 to "{omsch}"')
-
-        datum_str = item.get("datum")
-        if datum_str:
-            a(f'    set value of cell {row} of column 2 of t2 to (date "{_as_date(datum_str)}")')
-        else:
-            a(f'    set value of cell {row} of column 2 of t2 to ""')
-
-        a(f'    set value of cell {row} of column 3 of t2 to ""')  # Uur/KM always empty
-        a(f'    set value of cell {row} of column 4 of t2 to {bedrag}')
-
-    a('')
-
-    # ── Delete unused rows (N < 10) ──
-    # Delete from row 11 down to row N+2 (the first unused item row).
-    if N < 10:
-        for row in range(11, N + 1, -1):
-            a(f'    delete row {row} of t2')
+        # Adjust template row count (template has 10 item rows, R2–R11)
+        if rows_needed < 10:
+            for row in range(11, rows_needed + 1, -1):
+                a(f'    delete row {row} of t2')
+        elif rows_needed > 10:
+            for k in range(rows_needed - 10):
+                a(f'    add row above (row {12 + k} of t2)')
         a('')
 
-    # After adjustments, totals are at:
-    #   subtotaal = N+2, first BTW = N+3, totaal = N+3+len(btw_sorted)
-    subtotaal_row = N + 2
+        # Fill item rows (spacer rows at 2,4,6,... are left blank from template)
+        for i, item in enumerate(items):
+            row = 3 + 2 * i  # item rows: R3, R5, R7, ...
+            omsch = _esc(item["omschrijving"])
+            bedrag = _fmt_num(item["bedrag"])
+
+            a(f'    set value of cell {row} of column 1 of t2 to "{omsch}"')
+
+            datum_str = item.get("datum")
+            if datum_str:
+                a(f'    set value of cell {row} of column 2 of t2 to (date "{_as_date(datum_str)}")')
+            else:
+                a(f'    set value of cell {row} of column 2 of t2 to ""')
+
+            a(f'    set value of cell {row} of column 3 of t2 to ""')
+            a(f'    set value of cell {row} of column 4 of t2 to {bedrag}')
+
+        a('')
+        subtotaal_row = 2 * N + 3  # first row after the final spacer
+
+    else:
+        # No spacers — pack items tightly (N > SPACER_THRESHOLD)
+        for i, item in enumerate(items):
+            row = i + 2  # R2, R3, R4, ...
+
+            if row > 11:
+                # Insert a row above the current subtotaal position.
+                # After (i-10) prior insertions, subtotaal is at row 12 + (i-10) = i+2.
+                a(f'    add row above (row {i + 2} of t2)')
+
+            omsch = _esc(item["omschrijving"])
+            bedrag = _fmt_num(item["bedrag"])
+
+            a(f'    set value of cell {row} of column 1 of t2 to "{omsch}"')
+
+            datum_str = item.get("datum")
+            if datum_str:
+                a(f'    set value of cell {row} of column 2 of t2 to (date "{_as_date(datum_str)}")')
+            else:
+                a(f'    set value of cell {row} of column 2 of t2 to ""')
+
+            a(f'    set value of cell {row} of column 3 of t2 to ""')
+            a(f'    set value of cell {row} of column 4 of t2 to {bedrag}')
+
+        a('')
+
+        # Delete unused rows from bottom
+        if N < 10:
+            for row in range(11, N + 1, -1):
+                a(f'    delete row {row} of t2')
+            a('')
+
+        subtotaal_row = N + 2
     first_btw_row = subtotaal_row + 1
 
     # ── Subtotaal ──
@@ -189,9 +221,17 @@ def _build_script(
 
     # ── Restore Euro currency format on all amount cells ──
     # Setting a value via AppleScript resets cell format from currency to automatic.
-    # We restore it here after all values have been written.
+    # Spacer rows are skipped (they're empty and should stay that way).
     a('    -- Restore Euro currency format (set value resets it to automatic)')
-    for row in range(2, totaal_row + 1):
+    if use_spacers:
+        # Item rows only: R3, R5, R7, ... (spacers at R2, R4, R6, ... stay empty)
+        for i in range(N):
+            a(f'    set format of cell {3 + 2 * i} of column 4 of t2 to currency')
+    else:
+        for row in range(2, subtotaal_row):
+            a(f'    set format of cell {row} of column 4 of t2 to currency')
+    # Summary rows always get currency format
+    for row in range(subtotaal_row, totaal_row + 1):
         a(f'    set format of cell {row} of column 4 of t2 to currency')
     a('')
 
