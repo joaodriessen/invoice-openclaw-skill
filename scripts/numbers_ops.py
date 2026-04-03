@@ -27,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from btw import resolve_btw, label as btw_label
+from btw import dutch_round, resolve_btw, label as btw_label
 
 ICLOUD_NUMBERS = Path.home() / "Library/Mobile Documents/com~apple~Numbers/Documents"
 TEMPLATE = Path(__file__).parent.parent / "templates" / "blank.numbers"
@@ -75,12 +75,12 @@ def _build_script(
     btw_groups: dict[float, float] = {}
     for item in items:
         rate = item["_rate"]
-        btw_groups[rate] = round(btw_groups.get(rate, 0.0) + item["bedrag"], 10)
+        btw_groups[rate] = dutch_round(btw_groups.get(rate, 0.0) + item["bedrag"])
 
     btw_sorted = sorted(btw_groups.items())  # ascending rate order
-    subtotaal = round(sum(item["bedrag"] for item in items), 2)
-    btw_total = round(sum(round(base * rate, 2) for rate, base in btw_sorted), 2)
-    totaal = round(subtotaal + btw_total, 2)
+    subtotaal = dutch_round(sum(item["bedrag"] for item in items))
+    btw_total = dutch_round(sum(dutch_round(base * rate) for rate, base in btw_sorted))
+    totaal = dutch_round(subtotaal + btw_total)
 
     lines: list[str] = []
     a = lines.append  # shorthand
@@ -167,7 +167,7 @@ def _build_script(
     # Template has exactly one BTW row. If multiple rates, insert extras.
     for j, (rate, base) in enumerate(btw_sorted):
         btw_row = first_btw_row + j
-        btw_amount = round(base * rate, 2)
+        btw_amount = dutch_round(base * rate)
         rate_label = btw_label(rate)
 
         if j > 0:
@@ -226,6 +226,11 @@ def create_invoice(invoice: dict[str, Any]) -> dict[str, Any]:
     numbers_path, pdf_path = resolve_output_paths(invoice)
 
     # Copy template to destination
+    if not TEMPLATE.exists():
+        return {
+            "status": "error",
+            "message": f"Template niet gevonden: {TEMPLATE}. Controleer of templates/blank.numbers aanwezig is.",
+        }
     shutil.copy2(TEMPLATE, numbers_path)
 
     # Build and run AppleScript
@@ -249,15 +254,17 @@ def create_invoice(invoice: dict[str, Any]) -> dict[str, Any]:
         numbers_path.unlink(missing_ok=True)
         return {"status": "error", "message": "Timeout — Numbers reageerde niet binnen 60s."}
 
-    # Calculate totals for return value
+    # Calculate totals for return value — group by rate (same method as invoice)
     items = invoice["line_items"]
-    subtotaal = round(sum(item["bedrag"] for item in items), 2)
-    btw_breakdown: dict[str, float] = {}
+    subtotaal = dutch_round(sum(item["bedrag"] for item in items))
+    btw_groups: dict[float, float] = {}
     for item in items:
         rate = resolve_btw(item["btw_type"])
-        lbl = btw_label(rate)
-        btw_breakdown[lbl] = round(btw_breakdown.get(lbl, 0.0) + item["bedrag"] * rate, 2)
-    totaal = round(subtotaal + sum(btw_breakdown.values()), 2)
+        btw_groups[rate] = dutch_round(btw_groups.get(rate, 0.0) + item["bedrag"])
+    btw_breakdown: dict[str, float] = {}
+    for rate, base in sorted(btw_groups.items()):
+        btw_breakdown[btw_label(rate)] = dutch_round(base * rate)
+    totaal = dutch_round(subtotaal + sum(btw_breakdown.values()))
 
     return {
         "status": "ok",

@@ -113,7 +113,8 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
 
     subject = f"Factuur {inv_num}: {project}"
 
-    first_name = opdrachtgever.split()[0] if opdrachtgever else ""
+    parts = opdrachtgever.split()
+    first_name = parts[0] if parts else ""
     greeting = f"Beste {first_name}," if first_name else "Beste,"
     body_lines = [
         greeting,

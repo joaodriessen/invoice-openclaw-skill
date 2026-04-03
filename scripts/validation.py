@@ -182,17 +182,24 @@ def validate_invoice(data: dict[str, Any]) -> dict[str, Any]:
 
     # Address
     address = data.get("address", [])
-    if isinstance(address, list):
+    if isinstance(address, str):
+        errors.append(
+            "Adres moet een lijst zijn, niet een string. "
+            "Gebruik: [\"Straatnaam 1\", \"1234 AB Stad\"]"
+        )
+    elif isinstance(address, list):
         if len(address) < 2:
             warnings.append(
                 "Adres heeft slechts één regel. Normaal zijn dat er twee "
                 "(straat + postcode/stad)."
             )
+        elif len(address) > 2:
+            warnings.append(
+                f"Adres heeft {len(address)} regels — alleen de eerste twee worden gebruikt."
+            )
         for j, line in enumerate(address, 1):
             if not line.strip():
                 errors.append(f"Adresregel {j} is leeg.")
-    elif isinstance(address, str):
-        warnings.append("Adres is een string — verwacht een lijst met afzonderlijke regels.")
 
     # BTW totals cross-check
     if not errors:

@@ -9,6 +9,8 @@ Sources: Rijksoverheid / Belastingdienst
 
 from __future__ import annotations
 
+import decimal
+
 # Canonical BTW rates
 RATE_9 = 0.09
 RATE_21 = 0.21
@@ -60,6 +62,19 @@ BTW_DESCRIPTION: dict[float, str] = {
 }
 
 VALID_TYPES = sorted(_RULES.keys())
+
+
+def dutch_round(amount: float, decimals: int = 2) -> float:
+    """
+    Round using standard half-up rounding (Dutch accounting convention).
+
+    Python's built-in round() uses banker's rounding (round half to even),
+    which can produce 1-cent discrepancies compared to what clients expect.
+    E.g. round(102.645, 2) = 102.64 in Python, but should be 102.65.
+    """
+    d = decimal.Decimal(str(amount))
+    factor = decimal.Decimal(10) ** -decimals
+    return float(d.quantize(factor, rounding=decimal.ROUND_HALF_UP))
 
 
 def resolve_btw(btw_type: str) -> float:
