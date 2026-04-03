@@ -20,6 +20,8 @@ Maakt facturen op basis van een Numbers-template, exporteert naar PDF, en maakt 
    - Project (`proposed_project`) — dit verschijnt in de e-mailonderwerp en bestandsnaam
    - Regelposten: omschrijving + bedrag per item
    - Wacht op expliciete bevestiging ("ja", "klopt", "go ahead") voor je `create` aanroept.
+
+**Projectnaam — nooit raden of afleiden.** Als de gebruiker geen expliciete projectnaam heeft opgegeven, stel de vraag: "Wat is de projectnaam? (bijv. 'Optreden Noordwijk')" — ook al staat de naam mogelijk in de context. De gebruiker beslist zelf wat erop de factuur komt.
 4. Roep `create` aan met volledige data.
 5. Meld de gebruiker het resultaat: factuurnummer, locatie, totaalbedrag.
 
