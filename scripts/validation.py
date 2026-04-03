@@ -99,11 +99,16 @@ def preflight(data: dict[str, Any]) -> dict[str, Any]:
         }
 
     # Detect next invoice number (informational — agent confirms before creating)
-    detected_number = next_invoice_number()
+    detected_number = data.get("invoice_number") or next_invoice_number()
+    proposed_project = data.get("project") or data.get("opdrachtgever", "")
 
     return {
         "status": "ok",
         "detected_next_invoice_number": detected_number,
+        "proposed_invoice_number": detected_number,
+        "proposed_opdrachtgever": data.get("opdrachtgever", ""),
+        "proposed_project": proposed_project,
+        "proposed_filename": f"Factuur {detected_number}",
         "note": (
             f"Volgende factuurnummer op basis van iCloud-scan: {detected_number}. "
             "Bevestig of gebruik 'invoice_number' om te overschrijven."

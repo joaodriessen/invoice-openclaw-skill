@@ -134,7 +134,11 @@ def action_create(data: dict) -> None:
     if data.get("send_email") or data.get("email_to"):
         email_result = draft_email(data, result)
 
-    # 8. Build final output
+    # 8. Delete PDF — Numbers file is the archive copy; PDF is only needed for email
+    pdf = Path(result["pdf_file"])
+    pdf.unlink(missing_ok=True)
+
+    # 9. Build final output
     output: dict = {
         "status": "ok",
         "invoice_number": data["invoice_number"],

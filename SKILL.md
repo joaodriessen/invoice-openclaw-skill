@@ -14,8 +14,14 @@ Maakt facturen op basis van een Numbers-template, exporteert naar PDF, en maakt 
 **Altijd in deze volgorde:**
 1. Roep `preflight` aan — controleer of alle benodigde informatie aanwezig is.
 2. Als er velden ontbreken: stel de gebruiker de vragen uit `questions[]`.
-3. Roep `create` aan met volledige data.
-4. Meld de gebruiker het resultaat: factuurnummer, locatie, totaalbedrag.
+3. **Bevestig met de gebruiker** — toon een samenvatting van wat er aangemaakt gaat worden:
+   - Factuurnummer (`proposed_invoice_number`)
+   - Opdrachtgever (`proposed_opdrachtgever`)
+   - Project (`proposed_project`) — dit verschijnt in de e-mailonderwerp en bestandsnaam
+   - Regelposten: omschrijving + bedrag per item
+   - Wacht op expliciete bevestiging ("ja", "klopt", "go ahead") voor je `create` aanroept.
+4. Roep `create` aan met volledige data.
+5. Meld de gebruiker het resultaat: factuurnummer, locatie, totaalbedrag.
 
 ## Commando
 
@@ -51,6 +57,10 @@ Altijd eerst uitvoeren. Geeft het volgende factuurnummer terug en toont ontbreke
 {
   "status": "ok",
   "detected_next_invoice_number": 528,
+  "proposed_invoice_number": 528,
+  "proposed_opdrachtgever": "Groove Music Productions",
+  "proposed_project": "Groove Music Productions",
+  "proposed_filename": "Factuur 528",
   "note": "Volgende factuurnummer op basis van iCloud-scan: 528. ..."
 }
 ```
