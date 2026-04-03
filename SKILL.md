@@ -179,7 +179,7 @@ Je kunt ook een percentage opgeven: `"btw_type": "9"`, `"btw_type": "0"`, `"btw_
 | `line_items[].omschrijving` | ja | — |
 | `line_items[].bedrag` | ja | — |
 | `line_items[].btw_type` | ja | — |
-| `project` | nee | = opdrachtgever |
+| `project` | ja | — (bijv. "Optreden Noordwijk") |
 | `date` | nee | vandaag |
 | `invoice_number` | nee | auto (scan iCloud) |
 | `line_items[].datum` | nee | leeg |

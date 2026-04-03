@@ -37,7 +37,7 @@ def next_invoice_number() -> int:
 
 # ── Required field definitions ────────────────────────────────────────────────
 
-REQUIRED_TOP = ["opdrachtgever", "line_items"]
+REQUIRED_TOP = ["opdrachtgever", "project", "line_items"]
 REQUIRED_ITEM = ["omschrijving", "bedrag", "btw_type"]
 
 SEND_EMAIL_REQUIRED = ["email_to"]
@@ -60,6 +60,13 @@ def preflight(data: dict[str, Any]) -> dict[str, Any]:
 
     if not data.get("opdrachtgever"):
         questions.append("Wie is de opdrachtgever (naam van het bedrijf of de persoon)?")
+
+    if not data.get("project"):
+        missing.append("project")
+        questions.append(
+            "Wat is de projectnaam? Dit verschijnt in de e-mailonderwerp "
+            "(bijv. 'Optreden Noordwijk', 'Muziekles maart 2026')."
+        )
 
     if not data.get("address"):
         missing.append("address")
