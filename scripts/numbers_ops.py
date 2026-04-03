@@ -187,6 +187,14 @@ def _build_script(
     a(f'    set value of cell {totaal_row} of column 4 of t2 to {_fmt_num(totaal)}')
     a('')
 
+    # ── Restore Euro currency format on all amount cells ──
+    # Setting a value via AppleScript resets cell format from currency to automatic.
+    # We restore it here after all values have been written.
+    a('    -- Restore Euro currency format (set value resets it to automatic)')
+    for row in range(2, totaal_row + 1):
+        a(f'    set format of cell {row} of column 4 of t2 to currency')
+    a('')
+
     # ── Save and export ──
     a('    save doc')
     a(f'    export doc to POSIX file "{pdf_path}" as PDF')
