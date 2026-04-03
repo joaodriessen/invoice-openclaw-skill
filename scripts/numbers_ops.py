@@ -215,8 +215,7 @@ def resolve_output_paths(invoice: dict[str, Any]) -> tuple[Path, Path]:
         invoice.get("date", datetime.today().strftime("%Y-%m-%d")), "%Y-%m-%d"
     ).year
 
-    safe_project = "".join(c for c in project if c.isalnum() or c in " -_").strip()
-    filename = f"Factuur {inv_num} - {safe_project}" if safe_project else f"Factuur {inv_num}"
+    filename = f"Factuur {inv_num}"
 
     year_dir = ICLOUD_NUMBERS / str(year)
     year_dir.mkdir(parents=True, exist_ok=True)
