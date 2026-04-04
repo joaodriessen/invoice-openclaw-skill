@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Allow imports from scripts/ regardless of cwd
@@ -67,6 +67,29 @@ def _normalise_items(data: dict) -> None:
 
 def _default_date() -> str:
     return datetime.today().strftime("%Y-%m-%d")
+
+
+LEDGER_PATH = Path.home() / ".openclaw" / "workspace" / "memory" / "invoices-ledger.json"
+
+def _write_ledger(data: dict, result: dict) -> None:
+    """Append invoice to the Mission Control finance ledger. Non-fatal."""
+    entry = {
+        "invoice_number": result["invoice_number"],
+        "date": data.get("date", _default_date()),
+        "opdrachtgever": data.get("opdrachtgever", ""),
+        "project": data.get("project") or data.get("opdrachtgever", ""),
+        "subtotaal": result["subtotaal"],
+        "btw": result["btw"],
+        "totaal": result["totaal"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        ledger = json.loads(LEDGER_PATH.read_text()) if LEDGER_PATH.exists() else []
+        if not any(e.get("invoice_number") == entry["invoice_number"] for e in ledger):
+            ledger.append(entry)
+            LEDGER_PATH.write_text(json.dumps(ledger, ensure_ascii=False, indent=2))
+    except Exception:
+        pass  # ledger write failure is non-fatal
 
 
 # ── Action handlers ───────────────────────────────────────────────────────────
@@ -153,6 +176,7 @@ def action_create(data: dict) -> None:
     if email_result:
         output["email"] = email_result
 
+    _write_ledger(data, result)
     _out(output)
 
 
