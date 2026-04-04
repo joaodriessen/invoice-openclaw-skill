@@ -83,7 +83,7 @@ def preflight(data: dict[str, Any]) -> dict[str, Any]:
     else:
         for i, item in enumerate(items, 1):
             for field in REQUIRED_ITEM:
-                if field not in item or item[field] in (None, "", 0):
+                if field not in item or item[field] in (None, "") or (field != "bedrag" and item[field] == 0):
                     missing.append(f"line_items[{i}].{field}")
                     if field == "btw_type":
                         questions.append(
@@ -145,8 +145,8 @@ def validate_invoice(data: dict[str, Any]) -> dict[str, Any]:
             errors.append(f"{label}: bedrag ontbreekt.")
         elif not isinstance(bedrag, (int, float)):
             errors.append(f"{label}: bedrag moet een getal zijn, niet '{bedrag}'.")
-        elif bedrag <= 0:
-            errors.append(f"{label}: bedrag moet groter dan 0 zijn (opgegeven: {bedrag}).")
+        elif bedrag < 0:
+            errors.append(f"{label}: bedrag mag niet negatief zijn (opgegeven: {bedrag}).")
         else:
             # Two decimal places check
             if round(bedrag, 2) != bedrag:
