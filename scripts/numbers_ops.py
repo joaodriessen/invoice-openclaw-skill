@@ -135,6 +135,12 @@ def _build_script(
                 a(f'    add row above (row {12 + k} of t2)')
         a('')
 
+        # Set spacer rows to compact height and item rows to full height
+        for i in range(N + 1):
+            a(f'    set height of row {2 + 2 * i} of t2 to 8')   # spacer: subtle gap
+        for i in range(N):
+            a(f'    set height of row {3 + 2 * i} of t2 to 22')  # item: readable
+
         # Fill item rows (spacer rows at 2,4,6,... are left blank from template)
         for i, item in enumerate(items):
             row = 3 + 2 * i  # item rows: R3, R5, R7, ...
