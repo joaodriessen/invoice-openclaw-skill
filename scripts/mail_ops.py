@@ -1,5 +1,5 @@
 """
-Apple Mail bridge — creates a draft invoice email.
+Apple Mail bridge, creates a draft invoice email.
 
 Strategy:
   1. Try AppleScript (supports auto-attachment, full draft creation).
@@ -8,7 +8,7 @@ Strategy:
 
 Sender: joaodriessen@gmail.com (Google account configured in Mail)
 Subject: Factuur <N>: <Project>
-Status: draft — not auto-sent, always opened for review.
+Status: draft, not auto-sent, always opened for review.
 """
 
 from __future__ import annotations
@@ -89,6 +89,24 @@ def _open_mailto(to_address: str, subject: str, body_lines: list[str]) -> None:
     subprocess.run(["open", url], check=False)
 
 
+def _email_greeting(opdrachtgever: str) -> str:
+    opdrachtgever = opdrachtgever.strip()
+    return f"Beste {opdrachtgever}," if opdrachtgever else "Beste,"
+
+
+def _email_description(invoice: dict[str, Any]) -> str:
+    items = invoice.get("line_items", [])
+    first_item = items[0] if items else {}
+    datum = first_item.get("datum")
+    if datum:
+        try:
+            human_date = f"{int(datum[8:10])} {['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'][int(datum[5:7]) - 1]} {datum[0:4]}"
+        except Exception:
+            human_date = datum
+        return f"Bijgevoegd de factuur voor {first_item.get('omschrijving', 'de werkzaamheden')} op {human_date}."
+    return f"Bijgevoegd de factuur voor {first_item.get('omschrijving', 'de werkzaamheden')}."
+
+
 def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     """
     Open a Mail draft with PDF attached.
@@ -104,7 +122,7 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
     if not pdf_path or not Path(pdf_path).exists():
         return {
             "status": "error",
-            "reason": "PDF niet gevonden — e-mail concept niet aangemaakt.",
+            "reason": "PDF niet gevonden, e-mail concept niet aangemaakt.",
         }
 
     inv_num = invoice["invoice_number"]
@@ -113,13 +131,10 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
 
     subject = f"Factuur {inv_num}: {project}"
 
-    parts = opdrachtgever.split()
-    first_name = parts[0] if parts else ""
-    greeting = f"Beste {first_name}," if first_name else "Beste,"
     body_lines = [
-        greeting,
+        _email_greeting(opdrachtgever),
         "",
-        "Bijgesloten de factuur voor de geleverde werkzaamheden.",
+        _email_description(invoice),
         "",
         "Met vriendelijke groet,",
         "Joao Driessen",

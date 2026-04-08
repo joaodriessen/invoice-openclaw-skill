@@ -215,3 +215,16 @@ De skill toont dan meerdere BTW-regels in de factuur.
 E-mail wordt aangemaakt als concept in Apple Mail (joaodriessen@gmail.com).
 **Niet automatisch verstuurd** — altijd eerst controleren.
 Onderwerp: `Factuur <N>: <Project>`
+
+Standaard concepttekst:
+
+```text
+Beste <Opdrachtgever>,
+
+Bijgevoegd de factuur voor <Omschrijving eerste regel> op <Datum eerste regel>.
+
+Met vriendelijke groet,
+Joao Driessen
+```
+
+Als er geen datum op de eerste regel staat, laat de skill het datumdeel weg.
