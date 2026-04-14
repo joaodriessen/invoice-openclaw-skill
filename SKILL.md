@@ -28,12 +28,12 @@ Maakt facturen op basis van een Numbers-template, exporteert naar PDF, en maakt 
 ## Commando
 
 ```bash
-python3 skills/invoice/scripts/invoice.py '<json>'
+/opt/homebrew/bin/python3 skills/invoice/scripts/invoice.py '<json>'
 ```
 
 Of via stdin:
 ```bash
-echo '<json>' | python3 skills/invoice/scripts/invoice.py
+echo '<json>' | /opt/homebrew/bin/python3 skills/invoice/scripts/invoice.py
 ```
 
 ## Actions

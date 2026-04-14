@@ -17,7 +17,7 @@ The template is pre-filled with Joao's contact details, KvK, BTW-ID, and IBAN.
 ## Usage
 
 ```bash
-python3 scripts/invoice.py '<json>'
+/opt/homebrew/bin/python3 scripts/invoice.py '<json>'
 ```
 
 See `SKILL.md` for the full agent-facing interface and all options.
