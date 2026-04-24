@@ -16,14 +16,24 @@ ICLOUD_NUMBERS = Path.home() / "Library/Mobile Documents/com~apple~Numbers/Docum
 # ── Invoice number detection ──────────────────────────────────────────────────
 
 def scan_invoice_numbers() -> list[int]:
-    """Return all invoice numbers found across all year folders in iCloud Numbers."""
+    """Return all invoice numbers found across iCloud Numbers folders, skipping unreadable entries."""
     numbers: list[int] = []
     if not ICLOUD_NUMBERS.exists():
         return numbers
-    for year_dir in ICLOUD_NUMBERS.iterdir():
-        if not year_dir.is_dir():
+    try:
+        year_entries = list(ICLOUD_NUMBERS.iterdir())
+    except OSError:
+        return numbers
+
+    for year_dir in year_entries:
+        try:
+            if not year_dir.is_dir():
+                continue
+            files = list(year_dir.iterdir())
+        except OSError:
             continue
-        for f in year_dir.iterdir():
+
+        for f in files:
             m = re.search(r"[Ff]actuur\s+(\d+)", f.name)
             if m:
                 numbers.append(int(m.group(1)))
