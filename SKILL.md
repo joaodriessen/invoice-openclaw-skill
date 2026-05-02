@@ -216,6 +216,11 @@ E-mail wordt aangemaakt als concept in Apple Mail (joaodriessen@gmail.com).
 **Niet automatisch verstuurd** — altijd eerst controleren.
 Onderwerp: `Factuur <N>: <Project>`
 
+Als AppleScript geen Mail-concept met bijlage kan maken, valt de skill terug
+naar `mailto:`. Dan is `email.status` `degraded`, `pdf_attached` is `false`,
+en `pdf_file` wijst naar de PDF die handmatig bijgevoegd moet worden. Meld dit
+expliciet aan Joao; behandel het niet als volledig succes.
+
 Standaard concepttekst:
 
 ```text

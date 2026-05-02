@@ -3,8 +3,9 @@ Apple Mail bridge, creates a draft invoice email.
 
 Strategy:
   1. Try AppleScript (supports auto-attachment, full draft creation).
-  2. Fall back to mailto: URL if AppleScript times out (Mail busy syncing).
-     In this case the compose window opens but the user must attach the PDF manually.
+  2. Fall back to mailto: URL if AppleScript fails or times out (Mail busy
+     syncing). In this case the compose window opens but the user must attach
+     the PDF manually, and the result is reported as degraded.
 
 Sender: joaodriessen@gmail.com (Google account configured in Mail)
 Subject: Factuur <N>: <Project>
@@ -62,8 +63,8 @@ def _try_applescript(
     subject: str,
     body_lines: list[str],
     pdf_path: str,
-) -> bool:
-    """Try creating the draft via AppleScript. Returns True on success."""
+) -> tuple[bool, str | None]:
+    """Try creating the draft via AppleScript."""
     script = _build_applescript(to_address, subject, body_lines, pdf_path)
     try:
         proc = subprocess.run(
@@ -72,12 +73,15 @@ def _try_applescript(
             text=True,
             timeout=APPLESCRIPT_TIMEOUT,
         )
-        return proc.returncode == 0
+        if proc.returncode == 0:
+            return True, None
+        detail = (proc.stderr or proc.stdout or "").strip()
+        return False, detail or f"osascript exited with {proc.returncode}"
     except subprocess.TimeoutExpired:
-        return False
+        return False, f"AppleScript timed out after {APPLESCRIPT_TIMEOUT}s"
 
 
-def _open_mailto(to_address: str, subject: str, body_lines: list[str]) -> None:
+def _open_mailto(to_address: str, subject: str, body_lines: list[str]) -> bool:
     """Open a mailto: URL — always works, but cannot auto-attach PDF."""
     body = "\n".join(body_lines)
     url = (
@@ -86,7 +90,8 @@ def _open_mailto(to_address: str, subject: str, body_lines: list[str]) -> None:
         + "?subject=" + urllib.parse.quote(subject)
         + "&body=" + urllib.parse.quote(body)
     )
-    subprocess.run(["open", url], check=False)
+    proc = subprocess.run(["open", url], check=False)
+    return proc.returncode == 0
 
 
 def _email_greeting(opdrachtgever: str) -> str:
@@ -141,7 +146,9 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
     ]
 
     # Try AppleScript (auto-attaches PDF)
-    success = _try_applescript(to_address, subject, body_lines, pdf_path)
+    success, applescript_error = _try_applescript(
+        to_address, subject, body_lines, pdf_path
+    )
     if success:
         return {
             "status": "ok",
@@ -150,18 +157,38 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
             "to": to_address,
             "sender": SENDER,
             "pdf_attached": True,
+            "pdf_file": pdf_path,
             "note": "Concept geopend in Mail met bijlage — controleer en verstuur handmatig.",
         }
 
     # Fallback: mailto URL (no attachment)
-    _open_mailto(to_address, subject, body_lines)
+    mailto_opened = _open_mailto(to_address, subject, body_lines)
+    if not mailto_opened:
+        return {
+            "status": "error",
+            "method": "mailto",
+            "subject": subject,
+            "to": to_address,
+            "sender": SENDER,
+            "pdf_attached": False,
+            "pdf_file": pdf_path,
+            "reason": (
+                "AppleScript kon de PDF niet bijvoegen en mailto kon geen "
+                "concept openen."
+            ),
+            "applescript_error": applescript_error,
+        }
+
     return {
-        "status": "ok",
+        "status": "degraded",
         "method": "mailto",
         "subject": subject,
         "to": to_address,
         "sender": SENDER,
         "pdf_attached": False,
+        "pdf_file": pdf_path,
+        "reason": "AppleScript kon de PDF niet automatisch bijvoegen.",
+        "applescript_error": applescript_error,
         "note": (
             f"Mail-concept geopend via mailto (PDF niet automatisch bijgevoegd). "
             f"Voeg de PDF handmatig toe: {pdf_path}"

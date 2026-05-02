@@ -16,7 +16,7 @@ The Numbers file and PDF land in:
 ~/Library/Mobile Documents/com~apple~Numbers/Documents/<year>/Factuur <N> - <Project>.pdf
 ```
 
-The email draft is opened in Mail but never sent automatically — always review before sending.
+The email draft is opened in Mail but never sent automatically — always review before sending. If Mail automation falls back to `mailto:`, the draft cannot include the PDF attachment; the command reports `email.status: "degraded"`, `pdf_attached: false`, and keeps `pdf_file` available for manual attachment.
 
 ## Requirements
 
