@@ -17,6 +17,7 @@ Run from workspace root or skill root — scripts/ is added to sys.path automati
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -69,9 +70,41 @@ def _default_date() -> str:
     return datetime.today().strftime("%Y-%m-%d")
 
 
-LEDGER_PATH = Path.home() / ".openclaw" / "workspace" / "memory" / "invoices-ledger.json"
+WORKSPACE_ROOT = Path.home() / ".openclaw" / "workspace"
+LEDGER_PATH = WORKSPACE_ROOT / "memory" / "invoices-ledger.json"
+PRODUCT_SUPERVISOR_PATH = WORKSPACE_ROOT / "automation" / "unified" / "product_supervisor.py"
 
-def _write_ledger(data: dict, result: dict) -> None:
+
+def _restamp_finance_summary() -> dict:
+    """Restamp the owner product after the ledger source changes."""
+    if not PRODUCT_SUPERVISOR_PATH.exists():
+        return {"status": "skipped", "reason": "product_supervisor.py missing"}
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(PRODUCT_SUPERVISOR_PATH),
+                "--write-manifests",
+                "--source",
+                "invoice_skill",
+                "--products",
+                "finance-summary",
+                "--json",
+            ],
+            cwd=str(WORKSPACE_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except Exception as exc:
+        return {"status": "error", "reason": str(exc)}
+    if proc.returncode != 0:
+        snippet = (proc.stderr or proc.stdout or "").strip()[-500:]
+        return {"status": "error", "reason": snippet or f"exit {proc.returncode}"}
+    return {"status": "ok"}
+
+
+def _write_ledger(data: dict, result: dict) -> dict:
     """Append invoice to the Mission Control finance ledger. Non-fatal."""
     entry = {
         "invoice_number": result["invoice_number"],
@@ -88,8 +121,10 @@ def _write_ledger(data: dict, result: dict) -> None:
         if not any(e.get("invoice_number") == entry["invoice_number"] for e in ledger):
             ledger.append(entry)
             LEDGER_PATH.write_text(json.dumps(ledger, ensure_ascii=False, indent=2))
+            return {"status": "written", "path": str(LEDGER_PATH), "finance_summary": _restamp_finance_summary()}
+        return {"status": "already_present", "path": str(LEDGER_PATH)}
     except Exception:
-        pass  # ledger write failure is non-fatal
+        return {"status": "error", "path": str(LEDGER_PATH)}
 
 
 # ── Action handlers ───────────────────────────────────────────────────────────
@@ -173,7 +208,10 @@ def action_create(data: dict) -> None:
     if email_result:
         output["email"] = email_result
 
-    _write_ledger(data, result)
+    ledger_result = _write_ledger(data, result)
+    output["ledger"] = ledger_result
+    if ledger_result.get("finance_summary", {}).get("status") == "error":
+        output.setdefault("warnings", []).append("Finance summary restamp failed; run product supervisor for finance-summary.")
     _out(output)
 
 
