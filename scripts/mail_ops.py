@@ -30,6 +30,7 @@ def _esc(text: str) -> str:
 
 def _build_applescript(
     to_address: str,
+    cc_addresses: list[str],
     subject: str,
     body_lines: list[str],
     pdf_path: str,
@@ -48,24 +49,31 @@ def _build_applescript(
         '    set content of newMsg to msgBody',
         '    tell newMsg',
         f'        make new to recipient with properties {{address: "{to_esc}"}}',
+    ]
+    for cc_address in cc_addresses:
+        lines.append(
+            f'        make new cc recipient with properties {{address: "{_esc(cc_address)}"}}'
+        )
+    lines.extend([
         f'        make new attachment with properties {{file name: POSIX file "{pdf_esc}"}}',
         '    end tell',
         '    set visible of newMsg to true',
         '    activate',
         'end tell',
         'return "ok"',
-    ]
+    ])
     return "\n".join(lines)
 
 
 def _try_applescript(
     to_address: str,
+    cc_addresses: list[str],
     subject: str,
     body_lines: list[str],
     pdf_path: str,
 ) -> tuple[bool, str | None]:
     """Try creating the draft via AppleScript."""
-    script = _build_applescript(to_address, subject, body_lines, pdf_path)
+    script = _build_applescript(to_address, cc_addresses, subject, body_lines, pdf_path)
     try:
         proc = subprocess.run(
             ["osascript", "-e", script],
@@ -81,15 +89,19 @@ def _try_applescript(
         return False, f"AppleScript timed out after {APPLESCRIPT_TIMEOUT}s"
 
 
-def _open_mailto(to_address: str, subject: str, body_lines: list[str]) -> bool:
+def _open_mailto(
+    to_address: str,
+    cc_addresses: list[str],
+    subject: str,
+    body_lines: list[str],
+) -> bool:
     """Open a mailto: URL — always works, but cannot auto-attach PDF."""
     body = "\n".join(body_lines)
-    url = (
-        "mailto:"
-        + urllib.parse.quote(to_address, safe="@")
-        + "?subject=" + urllib.parse.quote(subject)
-        + "&body=" + urllib.parse.quote(body)
-    )
+    params = {"subject": subject, "body": body}
+    if cc_addresses:
+        params["cc"] = ",".join(cc_addresses)
+    url = "mailto:" + urllib.parse.quote(to_address, safe="@")
+    url += "?" + urllib.parse.urlencode(params)
     proc = subprocess.run(["open", url], check=False)
     return proc.returncode == 0
 
@@ -122,6 +134,11 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
     to_address = invoice.get("email_to", "")
     if not to_address:
         return {"status": "skipped", "reason": "Geen e-mailadres opgegeven."}
+    raw_cc = invoice.get("email_cc") or invoice.get("cc") or []
+    if isinstance(raw_cc, str):
+        cc_addresses = [a.strip() for a in raw_cc.split(",") if a.strip()]
+    else:
+        cc_addresses = [str(a).strip() for a in raw_cc if str(a).strip()]
 
     pdf_path = result.get("pdf_file", "")
     if not pdf_path or not Path(pdf_path).exists():
@@ -147,7 +164,7 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
 
     # Try AppleScript (auto-attaches PDF)
     success, applescript_error = _try_applescript(
-        to_address, subject, body_lines, pdf_path
+        to_address, cc_addresses, subject, body_lines, pdf_path
     )
     if success:
         return {
@@ -155,6 +172,7 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
             "method": "applescript",
             "subject": subject,
             "to": to_address,
+            "cc": cc_addresses,
             "sender": SENDER,
             "pdf_attached": True,
             "pdf_file": pdf_path,
@@ -162,13 +180,14 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
         }
 
     # Fallback: mailto URL (no attachment)
-    mailto_opened = _open_mailto(to_address, subject, body_lines)
+    mailto_opened = _open_mailto(to_address, cc_addresses, subject, body_lines)
     if not mailto_opened:
         return {
             "status": "error",
             "method": "mailto",
             "subject": subject,
             "to": to_address,
+            "cc": cc_addresses,
             "sender": SENDER,
             "pdf_attached": False,
             "pdf_file": pdf_path,
@@ -184,6 +203,7 @@ def draft_email(invoice: dict[str, Any], result: dict[str, Any]) -> dict[str, An
         "method": "mailto",
         "subject": subject,
         "to": to_address,
+        "cc": cc_addresses,
         "sender": SENDER,
         "pdf_attached": False,
         "pdf_file": pdf_path,
